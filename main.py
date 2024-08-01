@@ -42,7 +42,6 @@ from fastapi import FastAPI ,HTTPException
 from pydantic import BaseModel
 import psycopg2
 from psycopg2 import sql
-import passlib
 from passlib.context import CryptContext
 
 app = FastAPI()
@@ -70,8 +69,31 @@ class Client(BaseModel):
     email: str
     password: str
 
-@app.post("/clients/")
-async def create_client(client: Client):
+@app.post("/Create tables/")
+async def create_table():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        insert_query = sql.SQL('''
+            CREATE TABLE public.clients (
+                email VARCHAR(100) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL);
+        ''')
+
+        cur.execute( insert_query)
+        conn.commit()
+
+        cur.close()
+        conn.close()
+        # print(client.name)
+        return {"message": "hi"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@app.post("/Insert client/")
+async def insert_client(client: Client):
     # print(client.name)
     try:
         conn = get_db_connection()
@@ -81,11 +103,10 @@ async def create_client(client: Client):
             INSERT INTO public.clients (email,password)
             VALUES (%s, %s)
         ''')
-        
 
         insert_values = (client.email,client.password,)
 
-        cur.execute(insert_query, insert_values)
+        cur.execute( insert_query, insert_values)
         conn.commit()
 
         cur.close()
@@ -95,16 +116,16 @@ async def create_client(client: Client):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@app.get("/Name of client")
-async def display_client(client: Client):
-    return {"Client Name": f"{client.email}"}
+# @app.get("/Name of client")
+# async def display_client(client: Client):
+#     return {"Client Name": f"{client.email}"}
 
-def get_password_hash(password: str):
-    return pwd_context.hash(password)
+# def get_password_hash(password: str):
+#     return pwd_context.hash(password)
 
-def verify_password(plain_password: str, hashed_password: str):
-    return pwd_context.verify(plain_password, hashed_password)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# def verify_password(plain_password: str, hashed_password: str):
+#     return pwd_context.verify(plain_password, hashed_password)
+# pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # if __name__ == "__main__":
 #     import uvicorn
