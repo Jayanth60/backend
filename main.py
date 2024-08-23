@@ -38,7 +38,7 @@ app.add_middleware(
 )
 
 DB_HOST = 'localhost'
-DB_NAME = 'postgres'
+DB_NAME = 'fastapi'
 DB_USER = 'postgres'
 DB_PASSWORD = 'jayanth'
 DB_PORT = '5432'
@@ -117,7 +117,7 @@ class getLead(BaseModel):
     #     logging.error(f"Failed to send account lock email to {email}: {str(e)}")
 
 
-
+#Creating clients 
 @app.post("/Insert client/")
 async def insert_client(client: Client, request: Request):
     try:
@@ -199,6 +199,8 @@ def create_access_token(data: dict, expires_delta: timedelta):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
+
+#Access token
 @app.post('/login', response_model=Token)
 async def check_client(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     try:
@@ -270,13 +272,15 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     except JWTError:
         raise credentials_exception
 
+
+# Authorize clients
 @app.get("/users")
 async def read_users_me(current_user: dict = Security(get_current_user)):
     return {"user": current_user}
 
 
 
-#Leads code.
+# Creating leads
 @app.post("/createleads")
 async def insert_lead(lead: Lead):
     try:
@@ -350,11 +354,15 @@ def check_table_exists(schema, table_name):
         logging.error(f"Error checking table existence: {error}")
         return False
 
+# Getting lead data
 @app.get("/getleads", response_model=List[getLead])
 async def get_leads():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
+
+        if not check_table_exists("public", "leads"):
+            raise HTTPException(status_code=404, detail=str('No data to display'))
 
         select_query = sql.SQL('''
             SELECT name, cc, phone, lead_status, stack, class_mode, created_at
@@ -380,6 +388,147 @@ async def get_leads():
             leads.append(lead)
 
         return leads
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+#Getting all details for update lead. 
+@app.get("/getlead/{lead_id}", response_model=Lead)
+async def get_lead(lead_id: str):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        if not check_table_exists("public", "leads"):
+            raise HTTPException(status_code=404, detail=str('No data to display'))
+
+        query = sql.SQL('''
+            SELECT id, name, cc, phone, email, fee_quoted, batch_timing, description, 
+                   lead_status, lead_source, stack, course, class_mode, 
+                   next_followup, created_at
+            FROM public.leads
+            WHERE id = %s
+        ''')
+        cur.execute(query, (lead_id,))
+        lead = cur.fetchone()
+
+        if not lead:
+            raise HTTPException(status_code=404, detail="Lead not found")
+
+        lead_data = {
+            "id": lead[0],
+            "name": lead[1],
+            "cc": lead[2],
+            "phone": lead[3],
+            "email": lead[4],
+            "fee_quoted": lead[5],
+            "batch_timing": lead[6],
+            "description": lead[7],
+            "lead_status": lead[8],
+            "lead_source": lead[9],
+            "stack": lead[10],
+            "course": lead[11],
+            "class_mode": lead[12],
+            "next_followup": lead[13],
+            "created_at": lead[14]
+        }
+
+        cur.close()
+        conn.close()
+
+        return lead_data
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Update lead
+@app.put("/updatelead/{lead_id}")
+async def update_lead(lead_id: str, lead: Lead):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        if not check_table_exists("public", "leads"):
+            raise HTTPException(status_code=404, detail=str('No data to update'))
+        
+
+        query = sql.SQL('''
+            SELECT id FROM public.leads WHERE id = %s
+        ''')
+        cur.execute(query, (lead_id,))
+        existing_lead = cur.fetchone()
+
+        if not existing_lead:
+            raise HTTPException(status_code=404, detail="Lead not found")
+
+        update_query = sql.SQL('''
+            UPDATE public.leads
+            SET name = %s,
+                cc = %s,
+                phone = %s,
+                email = %s,
+                fee_quoted = %s,
+                batch_timing = %s,
+                description = %s,
+                lead_status = %s,
+                lead_source = %s,
+                stack = %s,
+                course = %s,
+                class_mode = %s,
+                next_followup = %s,
+                created_at = %s
+            WHERE id = %s
+        ''')
+
+        updated_values = (
+            lead.name, lead.cc, lead.phone, lead.email, lead.fee_quoted,
+            lead.batch_timing, lead.description, lead.lead_status, lead.lead_source,
+            lead.stack, lead.course, lead.class_mode, lead.next_followup, lead.created_at, lead_id
+        )
+
+        cur.execute(update_query, updated_values)
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return {"message": f"Lead {lead.name} updated successfully"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+# Delete leads
+@app.delete("/deletelead/{lead_id}")
+async def delete_lead(lead_id: str):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        if not check_table_exists("public", "leads"):
+            raise HTTPException(status_code=404, detail=str('No data to delete'))
+
+        query = sql.SQL('''
+            SELECT id,name FROM public.leads WHERE id = %s
+        ''')
+        cur.execute(query, (lead_id,))
+        existing_lead = cur.fetchone()
+        id, name = existing_lead
+
+        if not existing_lead:
+            raise HTTPException(status_code=404, detail="Lead not found")
+
+        delete_query = sql.SQL('''
+            DELETE FROM public.leads WHERE id = %s
+        ''')
+        cur.execute(delete_query, (lead_id,))
+        conn.commit()
+
+        cur.close()
+        conn.close()
+
+        return {"message": f"Lead {name} deleted successfully"}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
