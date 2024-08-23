@@ -98,6 +98,9 @@ class getLead(BaseModel):
     class_mode : str
     created_at : datetime
 
+class getlead(BaseModel):
+    id : str
+
 # def send_account_lock_email(email: str):
 #     try:
 #         # Setup the MIME
@@ -200,7 +203,7 @@ def create_access_token(data: dict, expires_delta: timedelta):
     return encoded_jwt
 
 
-#Access token
+# Access token
 @app.post('/login', response_model=Token)
 async def check_client(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     try:
@@ -394,7 +397,7 @@ async def get_leads():
     
 
 #Getting all details for update lead. 
-@app.get("/getlead/{lead_id}", response_model=Lead)
+@app.get("/getlead_id/{lead_id}", response_model=getlead)
 async def get_lead(lead_id: str):
     try:
         conn = get_db_connection()
@@ -404,10 +407,7 @@ async def get_lead(lead_id: str):
             raise HTTPException(status_code=404, detail=str('No data to display'))
 
         query = sql.SQL('''
-            SELECT id, name, cc, phone, email, fee_quoted, batch_timing, description, 
-                   lead_status, lead_source, stack, course, class_mode, 
-                   next_followup, created_at
-            FROM public.leads
+            SELECT id FROM public.leads
             WHERE id = %s
         ''')
         cur.execute(query, (lead_id,))
@@ -417,21 +417,7 @@ async def get_lead(lead_id: str):
             raise HTTPException(status_code=404, detail="Lead not found")
 
         lead_data = {
-            "id": lead[0],
-            "name": lead[1],
-            "cc": lead[2],
-            "phone": lead[3],
-            "email": lead[4],
-            "fee_quoted": lead[5],
-            "batch_timing": lead[6],
-            "description": lead[7],
-            "lead_status": lead[8],
-            "lead_source": lead[9],
-            "stack": lead[10],
-            "course": lead[11],
-            "class_mode": lead[12],
-            "next_followup": lead[13],
-            "created_at": lead[14]
+            "id": lead[0]
         }
 
         cur.close()
