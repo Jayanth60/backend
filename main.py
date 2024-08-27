@@ -72,7 +72,6 @@ class Token(BaseModel):
     token_type: str
     email: str
 
-
 class Lead(BaseModel):
     name: str
     cc : str
@@ -87,19 +86,23 @@ class Lead(BaseModel):
     course : str
     class_mode : str
     next_followup : datetime
-    created_at : datetime
 
 class getLead(BaseModel):
+    id: str
     name: str
     cc: str
     phone: str
+    email: str
+    fee_quoted: int
+    batch_timing: str
+    description: str
     lead_status: str
-    stack : str
-    class_mode : str
-    created_at : datetime
-
-class getlead(BaseModel):
-    id : str
+    lead_source: str
+    stack: str
+    course: str
+    class_mode: str
+    next_followup: datetime
+    created_at: datetime
 
 # def send_account_lock_email(email: str):
 #     try:
@@ -283,7 +286,7 @@ async def read_users_me(current_user: dict = Security(get_current_user)):
 
 
 
-# Creating leads
+#Leads code
 @app.post("/createleads")
 async def insert_lead(lead: Lead):
     try:
@@ -326,12 +329,13 @@ async def insert_lead(lead: Lead):
             created_at
         )
         
+
         cur.execute(insert_query,values)
         conn.commit()
         cur.close()
         conn.close()
 
-        return {"message": f"Client {lead.name} added successfully"}
+        return {"message": f"Lead {lead.name} added successfully"}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -357,7 +361,8 @@ def check_table_exists(schema, table_name):
         logging.error(f"Error checking table existence: {error}")
         return False
 
-# Getting lead data
+
+# Getting leads.
 @app.get("/getleads", response_model=List[getLead])
 async def get_leads():
     try:
@@ -368,7 +373,7 @@ async def get_leads():
             raise HTTPException(status_code=404, detail=str('No data to display'))
 
         select_query = sql.SQL('''
-            SELECT name, cc, phone, lead_status, stack, class_mode, created_at
+            SELECT id, name, cc, phone, email, fee_quoted, batch_timing, description, lead_status, lead_source, stack, course, class_mode, next_followup, created_at
             FROM public.leads;
         ''')
 
@@ -380,13 +385,21 @@ async def get_leads():
         leads = []
         for row in rows:
             lead = getLead(
-                name=row[0],
-                cc=row[1],
-                phone=row[2],
-                lead_status=row[3],
-                stack=row[4],
-                class_mode=row[5],
-                created_at=row[6]
+                id=row[0],
+                name=row[1],
+                cc=row[2],
+                phone=row[3],
+                email=row[4],
+                fee_quoted=row[5],
+                batch_timing=row[6],
+                description=row[7],
+                lead_status=row[8],
+                lead_source=row[9],
+                stack=row[10],
+                course=row[11],
+                class_mode=row[12],
+                next_followup=row[13],
+                created_at=row[14]
             )
             leads.append(lead)
 
@@ -396,40 +409,7 @@ async def get_leads():
         raise HTTPException(status_code=500, detail=str(e))
     
 
-#Getting all details for update lead. 
-@app.get("/getlead_id/{lead_id}", response_model=getlead)
-async def get_lead(lead_id: str):
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-
-        if not check_table_exists("public", "leads"):
-            raise HTTPException(status_code=404, detail=str('No data to display'))
-
-        query = sql.SQL('''
-            SELECT id FROM public.leads
-            WHERE id = %s
-        ''')
-        cur.execute(query, (lead_id,))
-        lead = cur.fetchone()
-
-        if not lead:
-            raise HTTPException(status_code=404, detail="Lead not found")
-
-        lead_data = {
-            "id": lead[0]
-        }
-
-        cur.close()
-        conn.close()
-
-        return lead_data
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# Update lead
+#update lead
 @app.put("/updatelead/{lead_id}")
 async def update_lead(lead_id: str, lead: Lead):
     try:
@@ -464,14 +444,16 @@ async def update_lead(lead_id: str, lead: Lead):
                 course = %s,
                 class_mode = %s,
                 next_followup = %s,
-                created_at = %s
+                created_at =%s
             WHERE id = %s
         ''')
+
+        created_at = datetime.now(timezone.utc)
 
         updated_values = (
             lead.name, lead.cc, lead.phone, lead.email, lead.fee_quoted,
             lead.batch_timing, lead.description, lead.lead_status, lead.lead_source,
-            lead.stack, lead.course, lead.class_mode, lead.next_followup, lead.created_at, lead_id
+            lead.stack, lead.course, lead.class_mode, lead.next_followup, created_at, lead_id
         )
 
         cur.execute(update_query, updated_values)
@@ -485,7 +467,7 @@ async def update_lead(lead_id: str, lead: Lead):
         raise HTTPException(status_code=500, detail=str(e))
     
 
-# Delete leads
+#Delete leads
 @app.delete("/deletelead/{lead_id}")
 async def delete_lead(lead_id: str):
     try:
@@ -500,10 +482,11 @@ async def delete_lead(lead_id: str):
         ''')
         cur.execute(query, (lead_id,))
         existing_lead = cur.fetchone()
-        id, name = existing_lead
 
         if not existing_lead:
-            raise HTTPException(status_code=404, detail="Lead not found")
+            raise HTTPException(status_code=404, detail="Lead not found with that id")
+        
+        id , name = existing_lead
 
         delete_query = sql.SQL('''
             DELETE FROM public.leads WHERE id = %s
