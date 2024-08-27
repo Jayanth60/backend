@@ -198,6 +198,7 @@ def check_table_exists(schema, table_name):
         logging.error(f"Error checking table existence: {error}")
         return False
 
+# Access token
 def create_access_token(data: dict, expires_delta: timedelta):
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + expires_delta
@@ -206,7 +207,7 @@ def create_access_token(data: dict, expires_delta: timedelta):
     return encoded_jwt
 
 
-# Access token
+# login
 @app.post('/login', response_model=Token)
 async def check_client(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     try:
